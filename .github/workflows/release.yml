@@ -38,8 +38,8 @@ jobs:
           gradle --no-daemon --console=plain :app:assembleRelease 2>&1 | tee build-output.log
           result=${PIPESTATUS[0]}
           if [ "$result" -ne 0 ]; then
-            echo "Build failed; surfacing the final Gradle output as check annotations:"
-            tail -n 60 build-output.log | while IFS= read -r line; do echo "::error::$line"; done
+            echo "Build failed; surfacing Gradle diagnostics as check annotations:"
+            grep -E '(^e: |error:|FAILURE:|What went wrong:|Execution failed for task|^  >|^Caused by:|Could not resolve|A failure occurred)' build-output.log | tail -n 8 | while IFS= read -r line; do echo "::error::$line"; done
           fi
           exit "$result"
       - name: Stage APK
