@@ -299,25 +299,39 @@ class MainActivity : Activity() {
     }
 
     private fun removeSystemForUser(app: InstalledApp) {
+        val userId = Process.myUid() / 100000
+        val progress = AlertDialog.Builder(this)
+            .setMessage("Requesting root and asking Android to remove ${app.label} for user $userId…")
+            .setCancelable(false)
+            .create()
+        progress.show()
+
         worker.execute {
             val result = runCatching {
                 require(app.packageName.matches(Regex("[A-Za-z0-9_.]+")))
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "pm uninstall --user 0 ${app.packageName}"))
-                val out = process.inputStream.bufferedReader().readText()
-                val err = process.errorStream.bufferedReader().readText()
+                val command = "if [ \"\$(id -u)\" != \"0\" ]; then echo 'Root was not granted'; exit 126; fi; echo ROOT_GRANTED; pm uninstall --user $userId ${app.packageName}"
+                val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
                 val code = process.waitFor()
-                Triple(code, out.trim(), err.trim())
+                Triple(code, output, output.contains("ROOT_GRANTED"))
             }
             runOnUiThread {
-                val success = result.getOrNull()?.let { it.first == 0 && it.second.contains("Success", true) } == true
-                val message = result.fold(
-                    { "${it.second.ifBlank { it.third.ifBlank { "Exit code ${it.first}" } }}" },
-                    { "Could not run package manager: ${it.message ?: "unknown error"}" }
+                progress.dismiss()
+                val success = result.getOrNull()?.let { it.first == 0 && it.third && it.second.contains("Success", true) } == true
+                val response = result.fold(
+                    { "${it.second.ifBlank { "No output from su or Android package manager." }} (exit ${it.first})" },
+                    { "Could not start the root/package-manager command: ${it.message ?: "unknown error"}" }
                 )
+                val message = if (success) {
+                    "Android's package manager reported success for user $userId. A factory copy may still be present (or an updated system app may revert to its factory version). Shared dependencies and shared-storage files were left untouched."
+                } else {
+                    "The app did not report a successful removal. Confirm the root request in your root manager, then try again. Details: $response"
+                }
                 AlertDialog.Builder(this)
                     .setTitle(if (success) "Package removed for user" else "Could not remove package")
-                    .setMessage(if (success) "${app.label} is no longer installed for the current user. The factory copy may remain and can usually be restored with Android’s install-existing command. Shared dependencies and files were left untouched." else message)
-                    .setPositiveButton("OK") { _, _ -> refreshApps() }
+                    .setMessage(message)
+                    .setPositiveButton("Refresh list") { _, _ -> refreshApps() }
+                    .setNegativeButton("Close", null)
                     .show()
             }
         }
