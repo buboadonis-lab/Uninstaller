@@ -2,8 +2,6 @@ name: Build and publish APK
 
 on:
   push:
-    branches:
-      - arena/179d1ea7-uninstaller
     tags:
       - 'v*'
   workflow_dispatch:
