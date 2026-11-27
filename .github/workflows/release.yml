@@ -1,0 +1,55 @@
+name: Build and publish APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Assemble release APK
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Stage APK
+        run: cp app/build/outputs/apk/release/app-release.apk Uninstaller-${GITHUB_SHA}.apk
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Uninstaller-${{ github.sha }}
+          path: Uninstaller-${{ github.sha }}.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.0-build.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Uninstaller build {0}', github.run_number) }}
+          body: |
+            Android release APK built from `${{ github.sha }}`.
+
+            **Install:** download `Uninstaller-${{ github.sha }}.apk` and install it on your device. The APK is signed with the standard Android debug certificate so it can be installed without a private signing secret; future updates signed by a different build key may require uninstalling the prior build first.
+
+            System-package removal uses `pm uninstall --user 0` through `su`; it does not wipe the system partition or recursively remove dependencies.
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          files: Uninstaller-${{ github.sha }}.apk
+          fail_on_unmatched_files: true
