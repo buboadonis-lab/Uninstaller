@@ -107,7 +107,7 @@ class MainActivity : Activity() {
         search = EditText(this).apply {
             hint = "Search name or package"
             textSize = 15f
-            singleLine = true
+            setSingleLine(true)
             setPadding(dp(15), 0, dp(15), 0)
             background = rounded(Color.WHITE, line, 14)
             setTextColor(ink)
@@ -252,7 +252,7 @@ class MainActivity : Activity() {
         }
         body.addView(icon)
         body.addView(text(app.label, 20, ink, true))
-        body.addView(text(app.packageName, 12, muted, false).apply { setPadding(0, dp(3), 0, dp(12) })
+        body.addView(text(app.packageName, 12, muted, false).apply { setPadding(0, dp(3), 0, dp(12)) })
         body.addView(text(if (app.system) "Pre-installed / system package" else "Installed user app", 13, ink, true))
         body.addView(text("Version ${app.packageInfo.versionName ?: "unknown"} · ${if (app.updated) "system app with an update" else if (app.system) "included with device software" else "installed by a user"}", 12, muted, false).apply {
             setPadding(0, dp(5), 0, dp(10))
