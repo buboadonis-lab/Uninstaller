@@ -25,12 +25,23 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
       - name: Assemble release APK
-        run: gradle --no-daemon :app:assembleRelease
+        shell: bash
+        run: |
+          set +e
+          gradle --no-daemon --console=plain :app:assembleRelease 2>&1 | tee build-output.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            echo "Build failed; surfacing the final Gradle output as check annotations:"
+            tail -n 60 build-output.log | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+          exit "$result"
       - name: Stage APK
         run: cp app/build/outputs/apk/release/app-release.apk Uninstaller-${GITHUB_SHA}.apk
       - name: Upload build artifact
